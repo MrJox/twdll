@@ -953,8 +953,127 @@ static int ProtectGovernorsOnRegionTrade(lua_State* L) {
     return 1;
 }
 
+// ---- AI recruitment region inside the chosen province -------------------------------
+// The campaign AI picks a province to recruit an army in, then the region the army must
+// stand in: the first region in the province's own list (usually the capital). Its route
+// planner accepts any settlement of that province as the place to recruit, so an army that
+// already stands in another region of the province is told to stay, while the step that
+// issues the recruit order waits for it to be in that first region: it never recruits.
+// While enabled, an army standing in a region of the chosen province that its own faction
+// owns recruits there. Units and recruitment capacity are province-wide, so it gets the
+// same units without walking to the capital. Restored on Lua teardown.
+namespace {
+constexpr uintptr_t kRegionCallOffset = 0x10;   // E8 rel32 "call region-of" in the signature
+uintptr_t g_region_of_fn = 0;                   // original call target (thiscall, ecx = entry)
+int32_t   g_region_call_original_rel = 0;
+bool      g_army_region_recruit_on = false;
+
+twdll::TW_CaiRegion* __cdecl resolve_recruit_region(twdll::TW_CaiResourceMobile* army,
+                                                    twdll::TW_CaiFactionProvince* province,
+                                                    twdll::TW_CaiRegion* chosen) {
+    if (!army || !province || !chosen) return chosen;
+    twdll::TW_CaiRegion* here = army->m_region;
+    if (!here || here == chosen) return chosen;
+    if (!here->m_owner_link || here->m_owner_link->m_owner != army->m_owner) return chosen;
+    for (int i = 0; i < province->m_regions.size(); ++i) {
+        if (province->m_regions[i] == here) return here;
+    }
+    return chosen;
+}
+
+// Replaces the call at the patch site. esi = the province candidate being scored ([esi] is the
+// CAI faction-province); the caller's army pointer is at [caller esp + 0x88].
+__declspec(naked) void HookedRecruitRegionOf() {
+    __asm {
+        call dword ptr [g_region_of_fn]  // eax = region the engine chose
+        push ecx
+        push edx
+        push eax                         // chosen
+        push dword ptr [esi]             // CAI faction-province
+        push dword ptr [esp + 0x9C]      // army: caller esp + 0x88 (+ return address + 4 pushes)
+        call resolve_recruit_region
+        add esp, 12
+        pop edx
+        pop ecx
+        ret
+    }
+}
+
+bool set_region_call(int32_t rel) {
+    int32_t* p = reinterpret_cast<int32_t*>(g_ai_recruit_region_pick_addr + kRegionCallOffset + 1);
+    DWORD old_protect = 0;
+    if (!VirtualProtect(p, 4, PAGE_EXECUTE_READWRITE, &old_protect)) {
+        Log("[twdll] EnableAiRecruitInArmyRegion: VirtualProtect failed (%lu)", GetLastError());
+        return false;
+    }
+    *p = rel;
+    VirtualProtect(p, 4, old_protect, &old_protect);
+    FlushInstructionCache(GetCurrentProcess(), p, 4);
+    return true;
+}
+
+bool install_army_region_recruit() {
+    if (g_army_region_recruit_on) return true;
+    uint8_t* call = reinterpret_cast<uint8_t*>(g_ai_recruit_region_pick_addr + kRegionCallOffset);
+    if (call[0] != 0xE8) {
+        Log("[twdll] EnableAiRecruitInArmyRegion: call not found at the patch site - not patched");
+        return false;
+    }
+    g_region_call_original_rel = *reinterpret_cast<int32_t*>(call + 1);
+    g_region_of_fn = reinterpret_cast<uintptr_t>(call + 5) + g_region_call_original_rel;
+    const int32_t rel = static_cast<int32_t>(reinterpret_cast<intptr_t>(&HookedRecruitRegionOf) -
+                                             reinterpret_cast<intptr_t>(call + 5));
+    if (!set_region_call(rel)) return false;
+    g_army_region_recruit_on = true;
+    return true;
+}
+
+void remove_army_region_recruit() {
+    if (!g_army_region_recruit_on) return;
+    set_region_call(g_region_call_original_rel);
+    g_army_region_recruit_on = false;
+    Log("[twdll] EnableAiRecruitInArmyRegion: engine recruitment region restored");
+}
+} // namespace
+
+/***
+Fixes AI armies that never recruit while standing in a non-capital region of the province the
+AI chose to recruit them in. The AI sends such an army to "recruit in the province" and lets it
+stay where it is, but only issues the recruit order once the army stands in the province's first
+region (usually the capital), so the army waits forever. While this is on, an AI army standing in
+a region of the chosen province that its faction owns recruits there. Units and recruitment
+capacity come from the whole province, so it recruits the same units. Armies outside the chosen
+province and human factions are unchanged. AI turns run on every machine, so in multiplayer every
+player must have it on. Removed when the campaign's Lua state is torn down; call it again on every
+campaign load.
+@function EnableAiRecruitInArmyRegion
+@tparam[opt=true] boolean enabled true for the fix, false for vanilla behaviour
+@treturn boolean|nil true if the fix is now on, false if it is off, nil if the code was not found in this game build
+@usage
+-- In the campaign script:
+twdll.world.EnableAiRecruitInArmyRegion()
+*/
+static int EnableAiRecruitInArmyRegion(lua_State* L) {
+    bool enable = true;
+    if (l_type(L, 1) == LUA_TBOOLEAN) enable = l_tobool(L, 1);
+    if (!g_ai_recruit_region_pick_addr) {
+        Log("[twdll] EnableAiRecruitInArmyRegion: signature not resolved");
+        l_pushnil(L);
+        return 1;
+    }
+    if (enable) {
+        const bool ok = install_army_region_recruit();
+        Log("[twdll] EnableAiRecruitInArmyRegion: %s", ok ? "enabled" : "patch failed - vanilla behaviour kept");
+    } else {
+        remove_army_region_recruit();
+    }
+    l_pushboolean(L, g_army_region_recruit_on);
+    return 1;
+}
+
 extern const luaL_Reg world_functions[] = {
     {"ProtectGovernorsOnRegionTrade", ProtectGovernorsOnRegionTrade},
+    {"EnableAiRecruitInArmyRegion", EnableAiRecruitInArmyRegion},
     {"SetCustomBattleDefaultMap",   SetCustomBattleDefaultMap},
     {"AllowGiftRegion",             AllowGiftRegion},
     {"GetGiftRegionState",          GetGiftRegionState},
@@ -1003,6 +1122,7 @@ void uninstall_world_hook() {
     restore_gift_region();
     // custom battle default map: kept on purpose, see SetCustomBattleDefaultMap
     remove_governor_hooks();
+    remove_army_region_recruit();
 
     if (world_ctor_addr) {
         MH_DisableHook(reinterpret_cast<void*>(world_ctor_addr));

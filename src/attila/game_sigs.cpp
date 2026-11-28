@@ -75,6 +75,11 @@
 // Same function: the man-on-a-fort-wall test "distance > 10 m -> stumble, else 90 % death".
 // comiss xmm0, [10.0f] at +0x12; its m32 address at +0x15. ToB compares with 7.0.
 #define KILLZONE_WALL_RADIUS_SIG "83 7F 18 00 0F 85 ? ? ? ? 84 DB 0F 84 ? ? ? ? 0F 2F 05 ? ? ? ? 0F 86 ? ? ? ? 8B 44 24 18 85 C0 75"
+// CAI recruitment location search: turns the chosen province into the region the army must
+// stand in (push [esp+0x44] / push [esi] / call first-owned-region / add esp,8 / mov ecx,eax /
+// call region-of / ...). The army is at [esp+0x88] in this frame (read again at +0x2A).
+// The second call (+0x10) is redirected by world.EnableAiRecruitInArmyRegion.
+#define AI_RECRUIT_REGION_PICK_SIG "FF 74 24 44 FF 36 E8 ? ? ? ? 83 C4 08 8B C8 E8 ? ? ? ? 8B 4E 04 89 4C 24 18 8B 4E 0C 89 4C 24 4C 8B 4E 08 89 4C 24 48 8B 8C 24 88 00 00 00"
 // EMPIREBATTLE::UNIT::calculate_engine_hit_points(card32& current, card32& max) (thiscall):
 // current = surviving artillery pieces' hit points, max = initial pieces x full hit points.
 #define UNIT_CALC_ENGINE_HIT_POINTS_SIG "53 8B 5C 24 08 56 8B F1 8B 46 20 8B 80 88 00 00 00 C7 03 00 00 00 00 85 C0 75 0F 8B 44 24 10 5E 5B C7 00 00 00 00 00 C2 08 00 8B 46 20 55 57 33 FF 8B 80 88 00 00 00 8B 40 44 8B 68 68 E8"
@@ -111,6 +116,7 @@ FnCaFree           g_ca_free = nullptr;
 uintptr_t          g_region_trade_apply_addr = 0;
 uintptr_t          g_settlement_pre_change_hands_addr = 0;
 uintptr_t          g_character_kill_instant_addr = 0;
+uintptr_t          g_ai_recruit_region_pick_addr = 0;
 static uintptr_t   g_max_units_init_insn_addr = 0;
 static int*        g_max_units_in_army = nullptr;
 static int*        g_max_units_in_navy = nullptr;
@@ -223,5 +229,6 @@ const TW_GameSigInfo g_game_signatures[] = {
     {"DIPLOMATIC_ACTION_TRADE_REGIONS::apply_action",      (void**)&g_region_trade_apply_addr, REGION_TRADE_APPLY_SIG},
     {"SETTLEMENT::handle_garrison_army_and_navy_pre_change_hands", (void**)&g_settlement_pre_change_hands_addr, SETTLEMENT_PRE_CHANGE_HANDS_SIG},
     {"CHARACTER::kill_instant",                            (void**)&g_character_kill_instant_addr, CHARACTER_KILL_INSTANT_SIG},
+    {"CAI recruitment location: province to region",      (void**)&g_ai_recruit_region_pick_addr, AI_RECRUIT_REGION_PICK_SIG},
     {nullptr, nullptr, nullptr}
 };

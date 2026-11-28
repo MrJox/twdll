@@ -456,6 +456,14 @@ local function run_twdll_tests()
         end)
 
         -- ======================================================
+        -- TEST 7b: twdll.world EnableAiRecruitInArmyRegion on / off
+        -- ======================================================
+        test("Test 7b: EnableAiRecruitInArmyRegion", function(t)
+            t:assert_eq(twdll.world.EnableAiRecruitInArmyRegion(true), true, "EnableAiRecruitInArmyRegion(true) -> true")
+            t:assert_eq(twdll.world.EnableAiRecruitInArmyRegion(false), false, "EnableAiRecruitInArmyRegion(false) -> false")
+        end)
+
+        -- ======================================================
         -- TEST 8: game:add_unit_to_force — add 80 units to every army
         -- ======================================================
         test("Test 8: game:add_unit_to_force (add 80 to our armies)", function(t)

@@ -163,6 +163,8 @@ extern FnCaFree g_ca_free;
 extern uintptr_t g_region_trade_apply_addr;
 extern uintptr_t g_settlement_pre_change_hands_addr;
 extern uintptr_t g_character_kill_instant_addr;
+// CAI recruitment location search: province -> region step (world.EnableAiRecruitInArmyRegion)
+extern uintptr_t g_ai_recruit_region_pick_addr;
 
 int* get_max_units_in_army();
 int* get_max_units_in_navy();

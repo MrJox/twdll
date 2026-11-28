@@ -87,6 +87,11 @@ unowned DLC.</td>
 	<td class="summary">Offers the vanilla "Gift Region" diplomacy option between any factions, not only to hordes.</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#EnableAiRecruitInArmyRegion">EnableAiRecruitInArmyRegion ([enabled=true])</a></td>
+	<td class="summary">Fixes AI armies that never recruit while standing in a non-capital region of the province the
+AI chose to recruit them in.</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#ExitGame">ExitGame ()</a></td>
 	<td class="summary">Requests the engine to cleanly exit the game process to Windows.</td>
 	</tr>
@@ -254,6 +259,47 @@ campaign's Lua state is torn down; call it again on every campaign load.
 </span>twdll.world.<span class="function-name">AllowGiftRegion</span>(<span class="keyword">true</span>, { reverse = <span class="keyword">true</span>, horde_givers = <span class="keyword">true</span> })
 <span class="comment">-- Back to vanilla:
 </span>twdll.world.<span class="function-name">AllowGiftRegion</span>(<span class="keyword">false</span>)</pre>
+    </ul>
+
+</dd>
+    <dt>
+    <a name = "EnableAiRecruitInArmyRegion"></a>
+    <strong>EnableAiRecruitInArmyRegion ([enabled=true])</strong>
+    </dt>
+    <dd>
+    Fixes AI armies that never recruit while standing in a non-capital region of the province the
+AI chose to recruit them in.  The AI sends such an army to "recruit in the province" and lets it
+stay where it is, but only issues the recruit order once the army stands in the province's first
+region (usually the capital), so the army waits forever. While this is on, an AI army standing in
+a region of the chosen province that its faction owns recruits there. Units and recruitment
+capacity come from the whole province, so it recruits the same units. Armies outside the chosen
+province and human factions are unchanged. AI turns run on every machine, so in multiplayer every
+player must have it on. Removed when the campaign's Lua state is torn down; call it again on every
+campaign load.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">enabled</span>
+            <span class="types"><span class="type">boolean</span></span>
+         true for the fix, false for vanilla behaviour
+         (<em>default</em> true)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span> or <span class="type">nil</span></span>
+        true if the fix is now on, false if it is off, nil if the code was not found in this game build
+    </ol>
+
+
+
+    <h3>Usage:</h3>
+    <ul>
+        <pre class="example"><span class="comment">-- In the campaign script:
+</span>twdll.world.<span class="function-name">EnableAiRecruitInArmyRegion</span>()</pre>
     </ul>
 
 </dd>

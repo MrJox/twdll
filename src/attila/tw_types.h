@@ -475,14 +475,33 @@ struct TW_CaiFaction {
     TW_Faction* m_faction;     // 0xEC
 };
 
+// CAI_REGION +0x04: link object; +0x04 of the link is the CAI faction that owns the region
+struct TW_CaiRegionOwnerLink {
+    void*          _vptr;    // 0x00
+    TW_CaiFaction* m_owner;  // 0x04
+};
+
 struct TW_CaiRegion {
-    char        pad_00[0x114];
-    const char* m_settlement_key; // 0x114
+    char                   pad_00[0x4];
+    TW_CaiRegionOwnerLink* m_owner_link;     // 0x04
+    char                   pad_08[0x10C];
+    const char*            m_settlement_key; // 0x114
 };
 
 struct TW_CaiSettlement {
     char          pad_00[0x10];
     TW_CaiRegion* m_cai_region;   // 0x10
+};
+
+// CAI resource mobile: an army, navy or agent the campaign AI controls
+struct TW_CaiResourceMobile {
+    void*          _vptr;           // 0x00
+    TW_CaiFaction* m_owner;         // 0x04
+    void*          m_location_vptr; // 0x08  start of the embedded location
+    uint32_t       m_position;      // 0x0C  (uint16_t x, uint16_t y)
+    TW_CaiRegion*  m_region;        // 0x10  CAI region the mobile stands in
+    char           pad_14[0x30];
+    uint32_t       m_id;            // 0x44  CAI resource id
 };
 
 // EMPIREBATTLE::LAND_STATS — live battle statistics (embedded in UNIT via LAND_STATS_MANAGER)
@@ -513,6 +532,14 @@ struct TW_VectorNcc {
     bool empty() const { return m_size == 0; }
     T& operator[](int idx) { return m_elements[idx]; }
     const T& operator[](int idx) const { return m_elements[idx]; }
+};
+
+// CAI faction-province: one faction's view of one province (recruitment province candidate)
+struct TW_CaiFactionProvince {
+    char                        pad_00[0x98];
+    TW_CaiRegion*               m_main_region;  // 0x98  first region (usually the capital)
+    void*                       m_regions_vptr; // 0x9C
+    TW_VectorNcc<TW_CaiRegion*> m_regions;      // 0xA0  every region of the province, any owner
 };
 
 // EMPIREBATTLE::ENTITY
@@ -840,6 +867,13 @@ TW_ASSERT_OFFSET(TW_CaiFaction,    m_num_regions,           0xA4);
 TW_ASSERT_OFFSET(TW_CaiFaction,    m_faction,               0xEC);
 TW_ASSERT_OFFSET(TW_CaiRegion,     m_settlement_key,        0x114);
 TW_ASSERT_OFFSET(TW_CaiSettlement, m_cai_region,            0x10);
+TW_ASSERT_OFFSET(TW_CaiRegionOwnerLink, m_owner,       0x04);
+TW_ASSERT_OFFSET(TW_CaiRegion,          m_owner_link,  0x04);
+TW_ASSERT_OFFSET(TW_CaiResourceMobile,  m_owner,       0x04);
+TW_ASSERT_OFFSET(TW_CaiResourceMobile,  m_region,      0x10);
+TW_ASSERT_OFFSET(TW_CaiResourceMobile,  m_id,          0x44);
+TW_ASSERT_OFFSET(TW_CaiFactionProvince, m_main_region, 0x98);
+TW_ASSERT_OFFSET(TW_CaiFactionProvince, m_regions,     0xA0);
 TW_ASSERT_OFFSET(TW_LandStats,     charge_bonus,            0x38);
 TW_ASSERT_OFFSET(TW_LandStats,     morale,                  0x44);
 TW_ASSERT_OFFSET(TW_LandStats,     melee_attack,            0x48);
